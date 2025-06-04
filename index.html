@@ -41,7 +41,7 @@
 
     function login(shopKey) {
       const state = shopKey;
-      const authUrl = `https://api.loyverse.com/oauth/authorize?response_type=code&client_id=${config[shopKey].client_id}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=receipts.read&state=${state}`;
+      const authUrl = `https://api.loyverse.com/oauth/authorize?response_type=code&client_id=${config[shopKey].client_id}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=${state}`;
       window.location.href = authUrl;
     }
 
