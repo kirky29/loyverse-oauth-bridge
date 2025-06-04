@@ -1,10 +1,94 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>index</title>
+  <meta charset="UTF-8">
+  <title>Loyverse Daily Takings Dashboard</title>
+  <style>
+    body { font-family: sans-serif; padding: 2em; background: #f9f9f9; }
+    .shop { margin-bottom: 1.5em; padding: 1em; background: white; border-radius: 8px; box-shadow: 0 0 5px rgba(0,0,0,0.1); }
+    button { padding: 0.5em 1em; font-size: 1em; }
+  </style>
 </head>
-
 <body>
+  <h1>📊 Loyverse Daily Takings</h1>
+
+  <div class="shop" id="shop1">
+    <h2>Northcote Horses</h2>
+    <button onclick="login('shop1')">Login to Northcote Horses</button>
+    <p id="shop1-result"></p>
+  </div>
+
+  <div class="shop" id="shop2">
+    <h2>Hooftastic Finds</h2>
+    <button onclick="login('shop2')">Login to Hooftastic Finds</button>
+    <p id="shop2-result"></p>
+  </div>
+
+  <script>
+    const config = {
+      shop1: {
+        client_id: 'Northcote Horses',
+        client_secret: '_b7646LxCSky-I5U6h3IfBvJ17VoKmKN0FTaz07xzwceAJmfj-giEg==',
+      },
+      shop2: {
+        client_id: 'Hooftastic Finds',
+        client_secret: 'mzgSQGMk6RhfKtzU4NNIoEKKCTyychcEmJlX3vOmAE7uGtuT3NQsBg==',
+      }
+    };
+
+    const REDIRECT_URI = 'https://kirky29.github.io/loyverse-oauth-bridge/oauth-bridge.html';
+    const API_BASE = 'https://api.loyverse.com/v1.0';
+
+    function login(shopKey) {
+      const state = shopKey;
+      const authUrl = `https://api.loyverse.com/oauth/authorize?response_type=code&client_id=${config[shopKey].client_id}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=offline+receipts.read&state=${state}`;
+      window.location.href = authUrl;
+    }
+
+    async function exchangeCodeForToken(shopKey, code) {
+      const response = await fetch('https://api.loyverse.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code: code,
+          client_id: config[shopKey].client_id,
+          client_secret: config[shopKey].client_secret,
+          redirect_uri: REDIRECT_URI,
+        })
+      });
+      const data = await response.json();
+      return data.access_token;
+    }
+
+    async function fetchDailyTakings(shopKey, accessToken) {
+      const today = new Date();
+      const dateStr = today.toISOString().split('T')[0];
+      const from = `${dateStr}T00:00:00Z`;
+      const to = `${dateStr}T23:59:59Z`;
+
+      const res = await fetch(`${API_BASE}/receipts?filter[created_at][ge]=${from}&filter[created_at][le]=${to}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
+      const json = await res.json();
+      const total = json.receipts?.reduce((sum, r) => sum + (r.total_price || 0), 0);
+      document.getElementById(`${shopKey}-result`).innerText = total ? `£${(total / 100).toFixed(2)}` : 'No sales found';
+    }
+
+    // When redirected back from oauth-bridge.html
+    const params = new URLSearchParams(window.location.search);
+    const accountKey = params.get('account');
+    const code = localStorage.getItem(`code_${accountKey}`);
+    if (code && accountKey) {
+      exchangeCodeForToken(accountKey, code)
+        .then(token => fetchDailyTakings(accountKey, token))
+        .catch(err => {
+          console.error(err);
+          document.getElementById(`${accountKey}-result`).innerText = 'Error retrieving data.';
+        });
+    }
+  </script>
 </body>
 </html>
